@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card">
+  <h2>My Tasks</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Description</th>
+        <th>Assigned By</th>
+        <th>Status</th>
+        <th>Hours</th>
+        <th>Update</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr>
+        <td>{{ task['title'] }}</td>
+        <td>{{ task['description'] }}</td>
+        <td>{{ task['assigner_name'] }}</td>
+        <td>{{ task['status'] }}</td>
+        <td>{{ '%.1f'|format(task['hours_spent']) }} / {{ '%.1f'|format(task['hours_allocated']) }}</td>
+        <td>
+          <form action="{{ url_for('update_task', task_id=task['id']) }}" method="post" class="inline-form">
+            <select name="status">
+              <option value="todo" {% if task['status']=='todo' %}selected{% endif %}>To Do</option>
+              <option value="in_progress" {% if task['status']=='in_progress' %}selected{% endif %}>In Progress</option>
+              <option value="done" {% if task['status']=='done' %}selected{% endif %}>Done</option>
+            </select>
+            <input type="number" step="0.5" min="0" name="hours_spent" value="{{ task['hours_spent'] }}" />
+            <button class="btn" type="submit">Save</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">No tasks assigned to you.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

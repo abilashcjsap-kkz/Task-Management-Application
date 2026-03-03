@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card narrow">
+  <h2>Login</h2>
+  <form method="post" class="form-grid">
+    <label>
+      Username
+      <input name="username" required />
+    </label>
+    <label>
+      Password
+      <input type="password" name="password" required />
+    </label>
+    <button class="btn primary" type="submit">Login</button>
+  </form>
+  <p class="hint">Demo users: admin/admin123, manager/manager123, member/member123</p>
+</section>
+{% endblock %}

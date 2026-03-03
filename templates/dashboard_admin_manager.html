@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid-two">
+  <section class="card">
+    <h2>Overall Task Status</h2>
+    <div class="stats-grid">
+      <div><strong>Total:</strong> {{ summary['total_tasks'] }}</div>
+      <div><strong>To Do:</strong> {{ summary['todo_count'] or 0 }}</div>
+      <div><strong>In Progress:</strong> {{ summary['in_progress_count'] or 0 }}</div>
+      <div><strong>Done:</strong> {{ summary['done_count'] or 0 }}</div>
+      <div><strong>Allocated Hours:</strong> {{ '%.1f'|format(summary['total_allocated']) }}</div>
+      <div><strong>Spent Hours:</strong> {{ '%.1f'|format(summary['total_spent']) }}</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Assign Task</h2>
+    <form action="{{ url_for('create_task') }}" method="post" class="form-grid">
+      <label>Title <input name="title" required /></label>
+      <label>Description <textarea name="description" rows="3"></textarea></label>
+      <label>
+        Assign to Member
+        <select name="assigned_to" required>
+          <option value="">Select member</option>
+          {% for member in members %}
+          <option value="{{ member['id'] }}">{{ member['username'] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Allocated Hours <input type="number" step="0.5" min="0" name="hours_allocated" value="0" /></label>
+      <button class="btn primary" type="submit">Create Task</button>
+    </form>
+    {% if current_user['role'] == 'admin' %}
+    <a class="btn" href="{{ url_for('manage_members') }}">Manage Members</a>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>All Tasks</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Assigned To</th>
+        <th>Assigned By</th>
+        <th>Hours (Allocated / Spent)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr>
+        <td>{{ task['title'] }}</td>
+        <td>{{ task['status'] }}</td>
+        <td>{{ task['assignee_name'] }}</td>
+        <td>{{ task['assigner_name'] }}</td>
+        <td>{{ '%.1f'|format(task['hours_allocated']) }} / {{ '%.1f'|format(task['hours_spent']) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">No tasks available.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid-two">
+  <section class="card">
+    <h2>Create Member</h2>
+    <form method="post" class="form-grid">
+      <label>Username <input name="username" required /></label>
+      <label>Password <input type="password" name="password" required /></label>
+      <button class="btn primary" type="submit">Create Member</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Member Management</h2>
+    <p class="hint">Admins can delete members and reset their passwords.</p>
+  </section>
+</div>
+
+<section class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Created At</th>
+        <th>Reset Password</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in members %}
+      <tr>
+        <td>{{ member['username'] }}</td>
+        <td>{{ member['created_at'] }}</td>
+        <td>
+          <form action="{{ url_for('reset_password', member_id=member['id']) }}" method="post" class="inline-form">
+            <input name="new_password" type="password" placeholder="New password" required />
+            <button class="btn" type="submit">Reset</button>
+          </form>
+        </td>
+        <td>
+          <form action="{{ url_for('delete_member', member_id=member['id']) }}" method="post">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">No members found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
