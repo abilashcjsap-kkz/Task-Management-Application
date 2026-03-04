@@ -13,6 +13,7 @@
         <th>Status</th>
         <th>Hours Taken</th>
         <th>Update Hours</th>
+        <th>Update Status</th>
       </tr>
     </thead>
     <tbody>
@@ -26,21 +27,24 @@
         <td>{{ task['status'] }}</td>
         <td>{{ '%.2f'|format(task['hours_spent'] or 0) }}</td>
         <td>
-          <form id="update-task-{{ task['id'] }}" action="{{ url_for('update_task', task_id=task['id']) }}" method="post" class="inline-form wrap">
-            <input
-              type="number"
-              step="0.25"
-              min="0"
-              name="hours_spent"
-              value="{{ task['hours_spent'] }}"
-              required
-            />
-            <button class="btn" type="submit">Save</button>
+          <form action="{{ url_for('update_task', task_id=task['id']) }}" method="post" class="inline-form wrap">
+            <input type="number" step="0.25" min="0" name="hours_spent" value="{{ task['hours_spent'] }}" required />
+            <button class="btn" type="submit">Save Hours</button>
+          </form>
+        </td>
+        <td>
+          <form action="{{ url_for('update_task_status', task_id=task['id']) }}" method="post" class="inline-form">
+            <select name="status">
+              <option value="todo" {% if task['status']=='todo' %}selected{% endif %}>To Do</option>
+              <option value="in_progress" {% if task['status']=='in_progress' %}selected{% endif %}>In Progress</option>
+              <option value="done" {% if task['status']=='done' %}selected{% endif %}>Done</option>
+            </select>
+            <button class="btn" type="submit">Save Status</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="8">No tasks assigned.</td></tr>
+      <tr><td colspan="9">No tasks assigned.</td></tr>
       {% endfor %}
     </tbody>
   </table>

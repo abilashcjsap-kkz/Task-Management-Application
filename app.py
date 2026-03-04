@@ -176,9 +176,36 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        action = request.form.get("action", "login")
+        db = get_db()
+
+        if action == "change_password":
+            username = request.form["username"].strip()
+            old_password = request.form["old_password"]
+            new_password = request.form["new_password"]
+            confirm_password = request.form["confirm_password"]
+
+            user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+            if user is None or not check_password_hash(user["password_hash"], old_password):
+                flash("Invalid username or old password.", "danger")
+                return render_template("login.html")
+
+            if not new_password:
+                flash("New password is required.", "danger")
+                return render_template("login.html")
+
+            if new_password != confirm_password:
+                flash("New password and confirm password must match.", "danger")
+                return render_template("login.html")
+
+            db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (generate_password_hash(new_password), user["id"]))
+            db.commit()
+            flash("Password changed successfully. Please login with new password.", "success")
+            return render_template("login.html")
+
         username = request.form["username"].strip()
         password = request.form["password"]
-        user = get_db().execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         if user and check_password_hash(user["password_hash"], password):
             session.clear()
             session["user_id"] = user["id"]
@@ -432,6 +459,32 @@ def create_task():
     )
     db.commit()
     flash("Task created successfully.", "success")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/tasks/<int:task_id>/update-status", methods=["POST"])
+@login_required
+@role_required("admin", "manager", "member")
+def update_task_status(task_id):
+    db = get_db()
+    current_user = get_current_user()
+    task = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if task is None:
+        flash("Task not found.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if current_user["role"] == "member" and task["assigned_to"] != current_user["id"]:
+        flash("You can only update status for your assigned tasks.", "danger")
+        return redirect(url_for("dashboard"))
+
+    status = request.form["status"]
+    if status not in ["todo", "in_progress", "done"]:
+        flash("Invalid status.", "danger")
+        return redirect(url_for("dashboard"))
+
+    db.execute("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?", (status, datetime.utcnow().isoformat(), task_id))
+    db.commit()
+    flash("Task status updated successfully.", "success")
     return redirect(url_for("dashboard"))
 
 

@@ -9,6 +9,7 @@ Task Management Application is a Flask-based portal for Admins, Managers, and Me
 - Add users with **Name, Mail Id, Password, and Role (Member/Manager)**
 - Reset password/delete users (for manager/member)
 - Assign tasks to members
+- Update status of every task
 - Extend due dates
 - View overall task status
 - Download period-based task report (Excel-compatible CSV)
@@ -16,13 +17,19 @@ Task Management Application is a Flask-based portal for Admins, Managers, and Me
 ### Manager
 - Allocate tasks to members
 - Multiple managers can assign tasks to multiple members
+- Update status of every task
 - Extend due dates
 - View overall task status
 - Download period-based task report
 
 ### Member
 - View assigned tasks with **Client**, **Allocated Date**, and **Due Date**
-- Update only the **hours taken** for assigned tasks
+- Update status of assigned tasks
+- Update hours taken for assigned tasks
+
+## Password change
+- Password can be changed from the **Login page** for Admin/Manager/Member.
+- User must provide **username + old password + new password + confirm password**.
 
 ## Quick start
 
@@ -47,10 +54,3 @@ Open: `http://localhost:5000`
 python3 -m compileall app.py tests/test_app.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
-
-Manual smoke test:
-1. Login as **Admin** and create both manager and member users from Users page.
-2. Login as **manager** and create tasks for members.
-3. Login as **manager2** and create additional tasks for members.
-4. Login as **member** and update only hours for assigned tasks.
-5. Login as Admin/Manager and download report using date range on dashboard.
