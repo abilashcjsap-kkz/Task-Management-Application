@@ -174,6 +174,52 @@ class TaskManagementAppTestCase(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b"Hours updated successfully", resp.data)
 
+
+    def test_dashboard_task_filters_by_created_date_client_and_status(self):
+        with task_app.app.app_context():
+            db = task_app.get_db()
+            client_rows = db.execute("SELECT id FROM clients ORDER BY id").fetchall()
+            client1 = client_rows[0]["id"]
+            client2 = client_rows[1]["id"]
+
+        self.login("admin", "admin123")
+        self.client.post(
+            "/tasks/create",
+            data={
+                "client_id": str(client1),
+                "title": "FilterMatchTask",
+                "description": "match",
+                "assigned_to": "4",
+                "due_date": "2030-01-01",
+            },
+            follow_redirects=True,
+        )
+        self.client.post(
+            "/tasks/create",
+            data={
+                "client_id": str(client2),
+                "title": "FilterOtherTask",
+                "description": "other",
+                "assigned_to": "4",
+                "due_date": "2030-01-01",
+            },
+            follow_redirects=True,
+        )
+
+        with task_app.app.app_context():
+            db = task_app.get_db()
+            match_id = db.execute("SELECT id FROM tasks WHERE title = 'FilterMatchTask'").fetchone()["id"]
+            db.execute("UPDATE tasks SET status = 'done' WHERE id = ?", (match_id,))
+            db.commit()
+
+        response = self.client.get(
+            f"/dashboard?created_from=2000-01-01&created_to=2100-01-01&client_id={client1}&status=done",
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"FilterMatchTask", response.data)
+        self.assertNotIn(b"FilterOtherTask", response.data)
+
     def test_manager_can_download_report(self):
         self.login("manager", "manager123")
         report_resp = self.client.get("/reports/task-logs?start_date=2030-01-01&end_date=2030-01-31")

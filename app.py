@@ -230,21 +230,60 @@ def dashboard():
     db = get_db()
 
     if current_user["role"] in ["admin", "manager"]:
-        summary = db.execute(
-            """
+        created_from = request.args.get("created_from", "").strip()
+        created_to = request.args.get("created_to", "").strip()
+        status_filter = request.args.get("status", "").strip()
+        client_id_filter = request.args.get("client_id", "").strip()
+
+        filters = []
+        params = []
+
+        if created_from:
+            try:
+                datetime.strptime(created_from, "%Y-%m-%d")
+                filters.append("date(t.created_at) >= date(?)")
+                params.append(created_from)
+            except ValueError:
+                flash("Invalid created from date.", "danger")
+
+        if created_to:
+            try:
+                datetime.strptime(created_to, "%Y-%m-%d")
+                filters.append("date(t.created_at) <= date(?)")
+                params.append(created_to)
+            except ValueError:
+                flash("Invalid created to date.", "danger")
+
+        if status_filter in ["todo", "in_progress", "done"]:
+            filters.append("t.status = ?")
+            params.append(status_filter)
+
+        if client_id_filter:
+            try:
+                int(client_id_filter)
+                filters.append("t.client_id = ?")
+                params.append(client_id_filter)
+            except ValueError:
+                flash("Invalid client filter.", "danger")
+
+        where_clause = ""
+        if filters:
+            where_clause = " WHERE " + " AND ".join(filters)
+
+        summary_query = f"""
             SELECT
                 COUNT(*) AS total_tasks,
-                SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) AS todo_count,
-                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_count,
-                SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done_count,
-                SUM(CASE WHEN date(due_date) < date('now') AND status != 'done' THEN 1 ELSE 0 END) AS overdue_count,
-                COALESCE(SUM(hours_spent), 0) AS total_hours_spent
-            FROM tasks
-            """
-        ).fetchone()
+                SUM(CASE WHEN t.status = 'todo' THEN 1 ELSE 0 END) AS todo_count,
+                SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_count,
+                SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS done_count,
+                SUM(CASE WHEN date(t.due_date) < date('now') AND t.status != 'done' THEN 1 ELSE 0 END) AS overdue_count,
+                COALESCE(SUM(t.hours_spent), 0) AS total_hours_spent
+            FROM tasks t
+            {where_clause}
+        """
+        summary = db.execute(summary_query, params).fetchone()
 
-        tasks = db.execute(
-            """
+        tasks_query = f"""
             SELECT t.*, c.name AS client_name,
                    u.username AS assignee_name,
                    a.username AS assigner_name
@@ -252,12 +291,20 @@ def dashboard():
             JOIN clients c ON c.id = t.client_id
             JOIN users u ON u.id = t.assigned_to
             JOIN users a ON a.id = t.assigned_by
+            {where_clause}
             ORDER BY t.created_at DESC
-            """
-        ).fetchall()
+        """
+        tasks = db.execute(tasks_query, params).fetchall()
 
         members = db.execute("SELECT id, username FROM users WHERE role = 'member' ORDER BY username").fetchall()
         clients = db.execute("SELECT id, name FROM clients ORDER BY name").fetchall()
+
+        filter_values = {
+            "created_from": created_from,
+            "created_to": created_to,
+            "status": status_filter,
+            "client_id": client_id_filter,
+        }
 
         return render_template(
             "dashboard_admin_manager.html",
@@ -265,6 +312,7 @@ def dashboard():
             tasks=tasks,
             members=members,
             clients=clients,
+            filter_values=filter_values,
         )
 
     tasks = db.execute(

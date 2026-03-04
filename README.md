@@ -54,3 +54,12 @@ Open: `http://localhost:5000`
 python3 -m compileall app.py tests/test_app.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
+
+
+## Task list filters
+- In dashboard, Overall Task section supports **Task Created Date range** filtering.
+- In Task List section, filter options include **Task Created Date range, Client, and Status**.
+
+## Login page change password popup
+- Click **Change Password** link on login page to open a popup form.
+- Provide username, old password, new password and confirm password to update credentials.
