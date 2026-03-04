@@ -8,7 +8,7 @@
     <div><strong>In Progress:</strong> {{ summary['in_progress_count'] or 0 }}</div>
     <div><strong>Done:</strong> {{ summary['done_count'] or 0 }}</div>
     <div><strong>Overdue:</strong> {{ summary['overdue_count'] or 0 }}</div>
-    <div><strong>Logged Hours:</strong> {{ '%.2f'|format(summary['total_logged_hours'] or 0) }}</div>
+    <div><strong>Total Hours:</strong> {{ '%.2f'|format(summary['total_hours_spent'] or 0) }}</div>
   </div>
 </section>
 
@@ -42,7 +42,7 @@
   </section>
 
   <section class="card">
-    <h2>Export Task Logs (Excel-compatible CSV)</h2>
+    <h2>Download Task Report (Excel-compatible CSV)</h2>
     <form action="{{ url_for('export_task_logs') }}" method="get" class="form-grid">
       <label>Start Date <input type="date" name="start_date" required /></label>
       <label>End Date <input type="date" name="end_date" required /></label>
@@ -80,7 +80,7 @@
         <th>Status</th>
         <th>Allocated Date</th>
         <th>Due Date</th>
-        <th>Logged Hours</th>
+        <th>Hours Taken</th>
         <th>Extend Due Date</th>
       </tr>
     </thead>
@@ -93,7 +93,7 @@
         <td>{{ task['status'] }}</td>
         <td>{{ task['allocated_date'] }}</td>
         <td>{{ task['due_date'] }}</td>
-        <td>{{ '%.2f'|format(task['logged_hours'] or 0) }}</td>
+        <td>{{ '%.2f'|format(task['hours_spent'] or 0) }}</td>
         <td>
           <form action="{{ url_for('extend_due_date', task_id=task['id']) }}" method="post" class="inline-form">
             <input type="date" name="new_due_date" required />

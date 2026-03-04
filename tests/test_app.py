@@ -2,17 +2,17 @@ import os
 import tempfile
 import unittest
 
-import app as track_app
+import app as task_app
 
 
-class TrackManagementAppTestCase(unittest.TestCase):
+class TaskManagementAppTestCase(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.db_path = os.path.join(self.temp_dir.name, "test_track_management.db")
-        track_app.app.config.update(TESTING=True, SECRET_KEY="test-secret")
-        track_app.DATABASE = self.db_path
-        track_app.init_db()
-        self.client = track_app.app.test_client()
+        self.db_path = os.path.join(self.temp_dir.name, "test_task_management.db")
+        task_app.app.config.update(TESTING=True, SECRET_KEY="test-secret")
+        task_app.DATABASE = self.db_path
+        task_app.init_db()
+        self.client = task_app.app.test_client()
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -29,17 +29,10 @@ class TrackManagementAppTestCase(unittest.TestCase):
         self.assertEqual(create_resp.status_code, 200)
         self.assertIn(b"Client added successfully", create_resp.data)
 
-        with track_app.app.app_context():
-            db = track_app.get_db()
-            row = db.execute("SELECT id FROM clients WHERE name = 'Acme'").fetchone()
-
-        update_resp = self.client.post(f"/clients/{row['id']}/update", data={"name": "Acme Inc", "description": "Updated"}, follow_redirects=True)
-        self.assertIn(b"Client updated", update_resp.data)
-
     def test_manager_assigns_task_with_client_and_due_date(self):
         self.login("manager", "manager123")
-        with track_app.app.app_context():
-            db = track_app.get_db()
+        with task_app.app.app_context():
+            db = task_app.get_db()
             client_id = db.execute("SELECT id FROM clients LIMIT 1").fetchone()["id"]
 
         resp = self.client.post(
@@ -56,10 +49,10 @@ class TrackManagementAppTestCase(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b"Task created successfully", resp.data)
 
-    def test_member_updates_task_and_logs_hours(self):
+    def test_member_updates_status_and_hours_directly(self):
         self.login("admin", "admin123")
-        with track_app.app.app_context():
-            db = track_app.get_db()
+        with task_app.app.app_context():
+            db = task_app.get_db()
             client_id = db.execute("SELECT id FROM clients LIMIT 1").fetchone()["id"]
 
         self.client.post(
@@ -74,19 +67,19 @@ class TrackManagementAppTestCase(unittest.TestCase):
             follow_redirects=True,
         )
         self.logout()
-        self.login("member", "member123")
 
-        with track_app.app.app_context():
-            db = track_app.get_db()
+        self.login("member", "member123")
+        with task_app.app.app_context():
+            db = task_app.get_db()
             task_id = db.execute("SELECT id FROM tasks LIMIT 1").fetchone()["id"]
 
         resp = self.client.post(
             f"/tasks/{task_id}/update",
-            data={"status": "in_progress", "log_date": "2030-01-02", "hours": "4", "notes": "Initial draft"},
+            data={"status": "in_progress", "hours_spent": "4.5"},
             follow_redirects=True,
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertIn(b"Task and timesheet updated", resp.data)
+        self.assertIn(b"Task updated successfully", resp.data)
 
     def test_attendance_and_report(self):
         self.login("manager", "manager123")

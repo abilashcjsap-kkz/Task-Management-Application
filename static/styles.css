@@ -10,10 +10,11 @@ body {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  background: #0f172a;
-  color: #fff;
+  background: #eef2f7;
+  color: #0f172a;
   padding: 12px 20px;
   flex-wrap: wrap;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 .brand-wrap {
@@ -22,7 +23,10 @@ body {
   gap: 10px;
 }
 
-.logo { height: 46px; }
+.logo {
+  height: 46px;
+  background: transparent;
+}
 
 .top-nav {
   display: flex;
@@ -42,10 +46,13 @@ body {
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.narrow { max-width: 420px; margin: 50px auto; }
+.narrow {
+  max-width: 420px;
+  margin: 50px auto;
+}
 
 .grid-two {
   display: grid;
@@ -53,12 +60,25 @@ body {
   gap: 16px;
 }
 
-.form-grid { display: grid; gap: 8px; }
-.form-grid.compact { min-width: 220px; }
-.inline-form { display: flex; gap: 6px; align-items: center; }
-.inline-form.wrap { flex-wrap: wrap; }
+.form-grid {
+  display: grid;
+  gap: 8px;
+}
 
-input, select, textarea, button {
+.inline-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.inline-form.wrap {
+  flex-wrap: wrap;
+}
+
+input,
+select,
+textarea,
+button {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   padding: 8px;
@@ -73,20 +93,44 @@ input, select, textarea, button {
   cursor: pointer;
 }
 
-.btn.primary { background: #2563eb; color: #fff; }
-.btn.danger { background: #dc2626; color: #fff; }
+.btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btn.danger {
+  background: #dc2626;
+  color: #fff;
+}
 
 .pill {
   background: #334155;
+  color: white;
   border-radius: 999px;
   padding: 6px 10px;
 }
 
-.flash { padding: 10px; border-radius: 6px; margin-bottom: 10px; }
-.flash.success { background: #dcfce7; }
-.flash.warning { background: #fef3c7; }
-.flash.danger { background: #fee2e2; }
-.flash.info { background: #dbeafe; }
+.flash {
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.flash.success {
+  background: #dcfce7;
+}
+
+.flash.warning {
+  background: #fef3c7;
+}
+
+.flash.danger {
+  background: #fee2e2;
+}
+
+.flash.info {
+  background: #dbeafe;
+}
 
 .stats-grid {
   display: grid;
@@ -97,17 +141,16 @@ input, select, textarea, button {
 table {
   width: 100%;
   border-collapse: collapse;
-  overflow-x: auto;
-  display: block;
 }
 
-thead, tbody, tr { width: 100%; }
-
-th, td {
+th,
+td {
   text-align: left;
   border-bottom: 1px solid #e2e8f0;
   padding: 8px;
   vertical-align: top;
 }
 
-.hint { color: #64748b; }
+.hint {
+  color: #64748b;
+}

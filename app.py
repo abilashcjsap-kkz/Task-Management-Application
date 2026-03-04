@@ -9,7 +9,7 @@ from flask import Flask, Response, flash, g, redirect, render_template, request,
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE = os.path.join(BASE_DIR, "track_management.db")
+DATABASE = os.path.join(BASE_DIR, "task_management.db")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
@@ -27,6 +27,13 @@ def close_db(exception=None):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+def ensure_tasks_hours_column(db):
+    cursor = db.execute("PRAGMA table_info(tasks)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if "hours_spent" not in columns:
+        db.execute("ALTER TABLE tasks ADD COLUMN hours_spent REAL NOT NULL DEFAULT 0")
 
 
 def init_db():
@@ -68,28 +75,12 @@ def init_db():
             assigned_by INTEGER NOT NULL,
             allocated_date TEXT NOT NULL,
             due_date TEXT NOT NULL,
+            hours_spent REAL NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             FOREIGN KEY (client_id) REFERENCES clients(id),
             FOREIGN KEY (assigned_to) REFERENCES users(id),
             FOREIGN KEY (assigned_by) REFERENCES users(id)
-        )
-        """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS task_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            task_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            log_date TEXT NOT NULL,
-            hours REAL NOT NULL,
-            notes TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (task_id) REFERENCES tasks(id),
-            FOREIGN KEY (user_id) REFERENCES users(id)
         )
         """
     )
@@ -110,6 +101,7 @@ def init_db():
         """
     )
 
+    ensure_tasks_hours_column(db)
     db.commit()
 
     now = datetime.utcnow().isoformat()
@@ -221,13 +213,12 @@ def dashboard():
             """
             SELECT
                 COUNT(*) AS total_tasks,
-                SUM(CASE WHEN t.status = 'todo' THEN 1 ELSE 0 END) AS todo_count,
-                SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_count,
-                SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS done_count,
-                SUM(CASE WHEN date(t.due_date) < date('now') AND t.status != 'done' THEN 1 ELSE 0 END) AS overdue_count,
-                COALESCE(SUM(l.hours), 0) AS total_logged_hours
-            FROM tasks t
-            LEFT JOIN task_logs l ON l.task_id = t.id
+                SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) AS todo_count,
+                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_count,
+                SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done_count,
+                SUM(CASE WHEN date(due_date) < date('now') AND status != 'done' THEN 1 ELSE 0 END) AS overdue_count,
+                COALESCE(SUM(hours_spent), 0) AS total_hours_spent
+            FROM tasks
             """
         ).fetchone()
 
@@ -235,14 +226,11 @@ def dashboard():
             """
             SELECT t.*, c.name AS client_name,
                    u.username AS assignee_name,
-                   a.username AS assigner_name,
-                   COALESCE(SUM(l.hours), 0) AS logged_hours
+                   a.username AS assigner_name
             FROM tasks t
             JOIN clients c ON c.id = t.client_id
             JOIN users u ON u.id = t.assigned_to
             JOIN users a ON a.id = t.assigned_by
-            LEFT JOIN task_logs l ON l.task_id = t.id
-            GROUP BY t.id
             ORDER BY t.created_at DESC
             """
         ).fetchall()
@@ -271,14 +259,11 @@ def dashboard():
 
     tasks = db.execute(
         """
-        SELECT t.*, c.name AS client_name, a.username AS assigner_name,
-               COALESCE(SUM(l.hours), 0) AS logged_hours
+        SELECT t.*, c.name AS client_name, a.username AS assigner_name
         FROM tasks t
         JOIN clients c ON c.id = t.client_id
         JOIN users a ON a.id = t.assigned_by
-        LEFT JOIN task_logs l ON l.task_id = t.id
         WHERE t.assigned_to = ?
-        GROUP BY t.id
         ORDER BY t.created_at DESC
         """,
         (current_user["id"],),
@@ -346,11 +331,12 @@ def reset_password(member_id):
     if not new_password:
         flash("New password is required.", "danger")
         return redirect(url_for("manage_members"))
-    get_db().execute(
+    db = get_db()
+    db.execute(
         "UPDATE users SET password_hash = ? WHERE id = ? AND role = 'member'",
         (generate_password_hash(new_password), member_id),
     )
-    get_db().commit()
+    db.commit()
     flash("Password reset successfully.", "success")
     return redirect(url_for("manage_members"))
 
@@ -391,9 +377,10 @@ def update_client(client_id):
         flash("Client name is required.", "danger")
         return redirect(url_for("manage_clients"))
 
+    db = get_db()
     try:
-        get_db().execute("UPDATE clients SET name = ?, description = ? WHERE id = ?", (name, description, client_id))
-        get_db().commit()
+        db.execute("UPDATE clients SET name = ?, description = ? WHERE id = ?", (name, description, client_id))
+        db.commit()
         flash("Client updated.", "success")
     except sqlite3.IntegrityError:
         flash("Client name already exists.", "danger")
@@ -447,8 +434,8 @@ def create_task():
     db.execute(
         """
         INSERT INTO tasks
-            (title, description, status, client_id, assigned_to, assigned_by, allocated_date, due_date, created_at, updated_at)
-        VALUES (?, ?, 'todo', ?, ?, ?, ?, ?, ?, ?)
+            (title, description, status, client_id, assigned_to, assigned_by, allocated_date, due_date, hours_spent, created_at, updated_at)
+        VALUES (?, ?, 'todo', ?, ?, ?, ?, ?, 0, ?, ?)
         """,
         (title, description, client_id, assigned_to, session["user_id"], today, due_date, now, now),
     )
@@ -468,11 +455,12 @@ def extend_due_date(task_id):
         flash("Invalid date format.", "danger")
         return redirect(url_for("dashboard"))
 
-    get_db().execute(
+    db = get_db()
+    db.execute(
         "UPDATE tasks SET due_date = ?, updated_at = ? WHERE id = ?",
         (new_due_date, datetime.utcnow().isoformat(), task_id),
     )
-    get_db().commit()
+    db.commit()
     flash("Due date updated.", "success")
     return redirect(url_for("dashboard"))
 
@@ -489,43 +477,26 @@ def update_task(task_id):
         return redirect(url_for("dashboard"))
 
     status = request.form["status"]
-    log_date = request.form["log_date"]
-    hours = request.form.get("hours", "0").strip() or "0"
-    notes = request.form.get("notes", "").strip()
+    hours_spent = request.form.get("hours_spent", "0").strip() or "0"
 
     if status not in ["todo", "in_progress", "done"]:
         flash("Invalid status.", "danger")
         return redirect(url_for("dashboard"))
 
     try:
-        datetime.strptime(log_date, "%Y-%m-%d")
-        hours_value = float(hours)
+        hours_value = float(hours_spent)
         if hours_value < 0:
             raise ValueError
     except ValueError:
-        flash("Invalid log date or hours value.", "danger")
+        flash("Hours must be a non-negative number.", "danger")
         return redirect(url_for("dashboard"))
 
-    existing = db.execute(
-        "SELECT id FROM task_logs WHERE task_id = ? AND user_id = ? AND log_date = ?",
-        (task_id, current_user["id"], log_date),
-    ).fetchone()
-
-    now = datetime.utcnow().isoformat()
-    if existing:
-        db.execute(
-            "UPDATE task_logs SET hours = ?, notes = ?, updated_at = ? WHERE id = ?",
-            (hours_value, notes, now, existing["id"]),
-        )
-    else:
-        db.execute(
-            "INSERT INTO task_logs (task_id, user_id, log_date, hours, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (task_id, current_user["id"], log_date, hours_value, notes, now, now),
-        )
-
-    db.execute("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?", (status, now, task_id))
+    db.execute(
+        "UPDATE tasks SET status = ?, hours_spent = ?, updated_at = ? WHERE id = ?",
+        (status, hours_value, datetime.utcnow().isoformat(), task_id),
+    )
     db.commit()
-    flash("Task and timesheet updated.", "success")
+    flash("Task updated successfully.", "success")
     return redirect(url_for("dashboard"))
 
 
@@ -591,14 +562,19 @@ def export_task_logs():
 
     rows = get_db().execute(
         """
-        SELECT l.log_date, u.username AS member_name, c.name AS client_name, t.title AS task_title,
-               t.allocated_date, t.due_date, l.hours, l.notes, t.status
-        FROM task_logs l
-        JOIN users u ON u.id = l.user_id
-        JOIN tasks t ON t.id = l.task_id
+        SELECT date(t.updated_at) AS log_date,
+               u.username AS member_name,
+               c.name AS client_name,
+               t.title AS task_title,
+               t.allocated_date,
+               t.due_date,
+               t.hours_spent,
+               t.status
+        FROM tasks t
+        JOIN users u ON u.id = t.assigned_to
         JOIN clients c ON c.id = t.client_id
-        WHERE date(l.log_date) BETWEEN date(?) AND date(?)
-        ORDER BY l.log_date, u.username
+        WHERE date(t.updated_at) BETWEEN date(?) AND date(?)
+        ORDER BY t.updated_at DESC
         """,
         (start_date, end_date),
     ).fetchall()
@@ -606,14 +582,13 @@ def export_task_logs():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "Log Date",
+        "Updated Date",
         "Member",
         "Client",
         "Task",
         "Allocated Date",
         "Due Date",
-        "Hours",
-        "Notes",
+        "Hours Spent",
         "Status",
     ])
     for row in rows:
@@ -625,8 +600,7 @@ def export_task_logs():
                 row["task_title"],
                 row["allocated_date"],
                 row["due_date"],
-                row["hours"],
-                row["notes"],
+                row["hours_spent"],
                 row["status"],
             ]
         )
