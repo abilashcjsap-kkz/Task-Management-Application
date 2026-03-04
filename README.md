@@ -1,24 +1,32 @@
-# Task Management Application
+# Track Management Application
 
-A Flask-based task management application with role-based access for **Admin**, **Manager**, and **Member** users.
+Track Management Application is a Flask-based portal for Admins, Managers, and Members to manage clients, tasks, timesheets, attendance, and reporting.
 
-## Features
+## Role capabilities
 
-- **Admin**
-  - Create member accounts
-  - Delete member accounts
-  - Reset member passwords
-  - Assign tasks to members
-  - View overall task status and progress
-- **Manager**
-  - Assign tasks to members
-  - View overall task status and progress
-- **Member**
-  - View assigned tasks
-  - Update task status (`todo`, `in_progress`, `done`)
-  - Log hours spent on each task
+### Admin
+- Manage client list (add/update/delete only by Admin)
+- Manage members (create/delete/reset password)
+- Assign tasks to members
+- Extend due dates
+- View overall task/attendance status
+- Download period-based task log report (Excel-compatible CSV)
 
-## Quick Start
+### Manager
+- Assign tasks to members
+- Select client from dropdown during task allocation
+- Extend due dates
+- View overall task/attendance status
+- Submit attendance
+- Download period-based task log report
+
+### Member
+- View assigned tasks with **Client**, **Allocated Date**, and **Due Date**
+- Update task status
+- Enter or revise logged hours (timesheet logs)
+- Submit attendance
+
+## Quick start
 
 ```bash
 python3 -m venv .venv
@@ -27,34 +35,23 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open `http://localhost:5000`.
+Open: `http://localhost:5000`
 
-## Demo Credentials
-
+## Demo users
 - `admin / admin123`
 - `manager / manager123`
 - `member / member123`
 
-These users are auto-created on first run.
-
-
 ## How to test it
 
-Run these commands from the project root:
-
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m unittest discover -s tests -p 'test_*.py' -v
+python3 -m compileall app.py templates static tests/test_app.py
+python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
 Manual smoke test:
-
-1. Start the app with `python app.py`.
-2. Open `http://localhost:5000`.
-3. Login as Admin (`admin/admin123`) and create a member from **Manage Members**.
-4. Login as Manager and assign a task with allocated hours.
-5. Login as Member and update task status + hours spent.
-6. Login as Admin/Manager again and verify overall dashboard counts/hours.
-
+1. Login as **Admin** and open **Clients** page; add/update/delete a client.
+2. Login as **Manager** and create a task selecting a client and due date.
+3. Login as **Member**, verify task shows client + allocated date + due date, then log hours.
+4. Submit attendance as Member and Manager.
+5. Login as Admin/Manager and download logs using date range on dashboard.
