@@ -1,34 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="card">
-  <h2>My Attendance</h2>
-  <form action="{{ url_for('submit_attendance') }}" method="post" class="inline-form wrap">
-    <input type="date" name="attendance_date" required />
-    <select name="status">
-      <option value="present">Present</option>
-      <option value="half_day">Half Day</option>
-      <option value="absent">Absent</option>
-      <option value="leave">Leave</option>
-    </select>
-    <input name="remarks" placeholder="Remarks" />
-    <button class="btn" type="submit">Submit</button>
-  </form>
-
-  <table>
-    <thead>
-      <tr><th>Date</th><th>Status</th><th>Remarks</th></tr>
-    </thead>
-    <tbody>
-      {% for at in my_attendance %}
-      <tr><td>{{ at['attendance_date'] }}</td><td>{{ at['status'] }}</td><td>{{ at['remarks'] }}</td></tr>
-      {% else %}
-      <tr><td colspan="3">No attendance submitted.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</section>
-
-<section class="card">
   <h2>My Tasks</h2>
   <table>
     <thead>

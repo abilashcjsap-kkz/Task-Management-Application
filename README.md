@@ -1,30 +1,28 @@
 # Task Management Application
 
-Task Management Application is a Flask-based portal for Admins, Managers, and Members to manage clients, tasks, attendance, and reporting.
+Task Management Application is a Flask-based portal for Admins, Managers, and Members to manage clients, tasks, and reporting.
 
 ## Role capabilities
 
 ### Admin
 - Manage client list (add/update/delete only by Admin)
-- Manage members (create/delete/reset password)
+- Manage members (add member name, member mail id, and password)
 - Assign tasks to members
 - Extend due dates
-- View overall task and attendance status
+- View overall task status
 - Download period-based task report (Excel-compatible CSV)
 
 ### Manager
 - Assign tasks to members
 - Select client from dropdown during task allocation
 - Extend due dates
-- View overall task and attendance status
-- Submit attendance
+- View overall task status
 - Download period-based task report
 
 ### Member
 - View assigned tasks with **Client**, **Allocated Date**, and **Due Date**
 - Update task status
 - Update total hours taken directly
-- Submit attendance
 
 ## Quick start
 
@@ -51,7 +49,7 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 Manual smoke test:
 1. Login as **Admin** and open **Clients** page; add/update/delete a client.
-2. Login as **Manager** and create a task selecting a client and due date.
-3. Login as **Member**, verify task shows client + allocated date + due date, then update status and hours directly.
-4. Submit attendance as Member and Manager.
+2. Login as **Admin** and create a member with name, mail id and password.
+3. Login as **Manager** and create a task (client → title → description → member → due date).
+4. Login as **Member**, verify task shows client + allocated date + due date, then update status and hours directly.
 5. Login as Admin/Manager and download report using date range on dashboard.

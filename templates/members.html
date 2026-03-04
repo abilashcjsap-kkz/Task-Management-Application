@@ -3,7 +3,8 @@
 <section class="card">
   <h2>Member Management</h2>
   <form method="post" class="inline-form wrap">
-    <input name="username" placeholder="Username" required />
+    <input name="username" placeholder="Member name" required />
+    <input type="email" name="email" placeholder="Member mail id" required />
     <input type="password" name="password" placeholder="Password" required />
     <button class="btn primary" type="submit">Create Member</button>
   </form>
@@ -13,7 +14,8 @@
   <table>
     <thead>
       <tr>
-        <th>Username</th>
+        <th>Member Name</th>
+        <th>Member Mail Id</th>
         <th>Created</th>
         <th>Reset Password</th>
         <th>Delete</th>
@@ -23,6 +25,7 @@
       {% for member in members %}
       <tr>
         <td>{{ member['username'] }}</td>
+        <td>{{ member['email'] }}</td>
         <td>{{ member['created_at'] }}</td>
         <td>
           <form action="{{ url_for('reset_password', member_id=member['id']) }}" method="post" class="inline-form">
@@ -37,7 +40,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4">No members found.</td></tr>
+      <tr><td colspan="5">No members found.</td></tr>
       {% endfor %}
     </tbody>
   </table>

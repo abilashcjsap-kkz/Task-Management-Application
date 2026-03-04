@@ -30,10 +30,15 @@ def close_db(exception=None):
 
 
 def ensure_tasks_hours_column(db):
-    cursor = db.execute("PRAGMA table_info(tasks)")
-    columns = {row[1] for row in cursor.fetchall()}
+    columns = {row[1] for row in db.execute("PRAGMA table_info(tasks)").fetchall()}
     if "hours_spent" not in columns:
         db.execute("ALTER TABLE tasks ADD COLUMN hours_spent REAL NOT NULL DEFAULT 0")
+
+
+def ensure_users_email_column(db):
+    columns = {row[1] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "email" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def init_db():
@@ -45,6 +50,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
+            email TEXT,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('admin', 'manager', 'member')),
             created_at TEXT NOT NULL
@@ -85,46 +91,33 @@ def init_db():
         """
     )
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            attendance_date TEXT NOT NULL,
-            status TEXT NOT NULL CHECK(status IN ('present', 'absent', 'half_day', 'leave')),
-            remarks TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE (user_id, attendance_date),
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-        """
-    )
-
     ensure_tasks_hours_column(db)
+    ensure_users_email_column(db)
     db.commit()
 
     now = datetime.utcnow().isoformat()
     defaults = [
-        ("admin", "admin123", "admin"),
-        ("manager", "manager123", "manager"),
-        ("member", "member123", "member"),
+        ("admin", "admin@kamikaze.local", "admin123", "admin"),
+        ("manager", "manager@kamikaze.local", "manager123", "manager"),
+        ("member", "member@kamikaze.local", "member123", "member"),
     ]
-    for username, password, role in defaults:
-        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
-        if cursor.fetchone() is None:
+
+    for username, email, password, role in defaults:
+        existing = cursor.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if existing is None:
             cursor.execute(
-                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
-                (username, generate_password_hash(password), role, now),
+                "INSERT INTO users (username, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                (username, email, generate_password_hash(password), role, now),
             )
+        else:
+            cursor.execute("UPDATE users SET email = COALESCE(email, ?) WHERE username = ?", (email, username))
 
     default_clients = [
         ("KAMIKAZE Core", "Default client account"),
         ("Internal Operations", "Internal workstream"),
     ]
     for name, description in default_clients:
-        cursor.execute("SELECT id FROM clients WHERE name = ?", (name,))
-        if cursor.fetchone() is None:
+        if cursor.execute("SELECT id FROM clients WHERE name = ?", (name,)).fetchone() is None:
             cursor.execute(
                 "INSERT INTO clients (name, description, created_at) VALUES (?, ?, ?)",
                 (name, description, now),
@@ -237,16 +230,6 @@ def dashboard():
 
         members = db.execute("SELECT id, username FROM users WHERE role = 'member' ORDER BY username").fetchall()
         clients = db.execute("SELECT id, name FROM clients ORDER BY name").fetchall()
-        attendance_records = db.execute(
-            """
-            SELECT at.*, u.username
-            FROM attendance at
-            JOIN users u ON u.id = at.user_id
-            WHERE u.role IN ('member', 'manager')
-            ORDER BY at.attendance_date DESC, u.username
-            LIMIT 25
-            """
-        ).fetchall()
 
         return render_template(
             "dashboard_admin_manager.html",
@@ -254,7 +237,6 @@ def dashboard():
             tasks=tasks,
             members=members,
             clients=clients,
-            attendance_records=attendance_records,
         )
 
     tasks = db.execute(
@@ -269,17 +251,7 @@ def dashboard():
         (current_user["id"],),
     ).fetchall()
 
-    my_attendance = db.execute(
-        """
-        SELECT * FROM attendance
-        WHERE user_id = ?
-        ORDER BY attendance_date DESC
-        LIMIT 15
-        """,
-        (current_user["id"],),
-    ).fetchall()
-
-    return render_template("dashboard_member.html", tasks=tasks, my_attendance=my_attendance)
+    return render_template("dashboard_member.html", tasks=tasks)
 
 
 @app.route("/members", methods=["GET", "POST"])
@@ -289,22 +261,27 @@ def manage_members():
     db = get_db()
     if request.method == "POST":
         username = request.form["username"].strip()
+        email = request.form["email"].strip()
         password = request.form["password"].strip()
-        if not username or not password:
-            flash("Username and password are required.", "danger")
+
+        if not username or not email or not password:
+            flash("Member name, email and password are required.", "danger")
             return redirect(url_for("manage_members"))
+
         try:
             db.execute(
-                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, 'member', ?)",
-                (username, generate_password_hash(password), datetime.utcnow().isoformat()),
+                "INSERT INTO users (username, email, password_hash, role, created_at) VALUES (?, ?, ?, 'member', ?)",
+                (username, email, generate_password_hash(password), datetime.utcnow().isoformat()),
             )
             db.commit()
             flash("Member created successfully.", "success")
         except sqlite3.IntegrityError:
-            flash("Username already exists.", "danger")
+            flash("Member name already exists.", "danger")
         return redirect(url_for("manage_members"))
 
-    members = db.execute("SELECT * FROM users WHERE role = 'member' ORDER BY created_at DESC").fetchall()
+    members = db.execute(
+        "SELECT id, username, email, created_at FROM users WHERE role = 'member' ORDER BY created_at DESC"
+    ).fetchall()
     return render_template("members.html", members=members)
 
 
@@ -407,10 +384,10 @@ def delete_client(client_id):
 @role_required("admin", "manager")
 def create_task():
     db = get_db()
+    client_id = request.form["client_id"]
     title = request.form["title"].strip()
     description = request.form.get("description", "").strip()
     assigned_to = request.form["assigned_to"]
-    client_id = request.form["client_id"]
     due_date = request.form["due_date"]
 
     if not title:
@@ -500,49 +477,6 @@ def update_task(task_id):
     return redirect(url_for("dashboard"))
 
 
-@app.route("/attendance", methods=["POST"])
-@login_required
-@role_required("member", "manager")
-def submit_attendance():
-    current_user = get_current_user()
-    attendance_date = request.form["attendance_date"]
-    status = request.form["status"]
-    remarks = request.form.get("remarks", "").strip()
-
-    if status not in ["present", "absent", "half_day", "leave"]:
-        flash("Invalid attendance status.", "danger")
-        return redirect(url_for("dashboard"))
-
-    try:
-        datetime.strptime(attendance_date, "%Y-%m-%d")
-    except ValueError:
-        flash("Invalid attendance date.", "danger")
-        return redirect(url_for("dashboard"))
-
-    db = get_db()
-    now = datetime.utcnow().isoformat()
-    existing = db.execute(
-        "SELECT id FROM attendance WHERE user_id = ? AND attendance_date = ?",
-        (current_user["id"], attendance_date),
-    ).fetchone()
-
-    if existing:
-        db.execute(
-            "UPDATE attendance SET status = ?, remarks = ?, updated_at = ? WHERE id = ?",
-            (status, remarks, now, existing["id"]),
-        )
-        flash("Attendance updated.", "success")
-    else:
-        db.execute(
-            "INSERT INTO attendance (user_id, attendance_date, status, remarks, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (current_user["id"], attendance_date, status, remarks, now, now),
-        )
-        flash("Attendance submitted.", "success")
-
-    db.commit()
-    return redirect(url_for("dashboard"))
-
-
 @app.route("/reports/task-logs")
 @login_required
 @role_required("admin", "manager")
@@ -562,7 +496,7 @@ def export_task_logs():
 
     rows = get_db().execute(
         """
-        SELECT date(t.updated_at) AS log_date,
+        SELECT date(t.updated_at) AS updated_date,
                u.username AS member_name,
                c.name AS client_name,
                t.title AS task_title,
@@ -581,20 +515,22 @@ def export_task_logs():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "Updated Date",
-        "Member",
-        "Client",
-        "Task",
-        "Allocated Date",
-        "Due Date",
-        "Hours Spent",
-        "Status",
-    ])
+    writer.writerow(
+        [
+            "Updated Date",
+            "Member",
+            "Client",
+            "Task",
+            "Allocated Date",
+            "Due Date",
+            "Hours Spent",
+            "Status",
+        ]
+    )
     for row in rows:
         writer.writerow(
             [
-                row["log_date"],
+                row["updated_date"],
                 row["member_name"],
                 row["client_name"],
                 row["task_title"],

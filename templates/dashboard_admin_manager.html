@@ -16,8 +16,6 @@
   <section class="card">
     <h2>Assign Task</h2>
     <form action="{{ url_for('create_task') }}" method="post" class="form-grid">
-      <label>Title <input name="title" required /></label>
-      <label>Description <textarea name="description" rows="3"></textarea></label>
       <label>
         Client
         <select name="client_id" required>
@@ -27,6 +25,8 @@
           {% endfor %}
         </select>
       </label>
+      <label>Title <input name="title" required /></label>
+      <label>Description <textarea name="description" rows="3"></textarea></label>
       <label>
         Member
         <select name="assigned_to" required>
@@ -48,24 +48,6 @@
       <label>End Date <input type="date" name="end_date" required /></label>
       <button class="btn primary" type="submit">Download Report</button>
     </form>
-
-    {% if current_user['role'] == 'manager' %}
-    <h3>Attendance</h3>
-    <form action="{{ url_for('submit_attendance') }}" method="post" class="form-grid">
-      <label>Date <input type="date" name="attendance_date" required /></label>
-      <label>
-        Status
-        <select name="status">
-          <option value="present">Present</option>
-          <option value="half_day">Half Day</option>
-          <option value="absent">Absent</option>
-          <option value="leave">Leave</option>
-        </select>
-      </label>
-      <label>Remarks <input name="remarks" /></label>
-      <button class="btn" type="submit">Submit Attendance</button>
-    </form>
-    {% endif %}
   </section>
 </div>
 
@@ -103,32 +85,6 @@
       </tr>
       {% else %}
       <tr><td colspan="8">No tasks available.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</section>
-
-<section class="card">
-  <h2>Recent Attendance (Managers & Members)</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>User</th>
-        <th>Date</th>
-        <th>Status</th>
-        <th>Remarks</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for at in attendance_records %}
-      <tr>
-        <td>{{ at['username'] }}</td>
-        <td>{{ at['attendance_date'] }}</td>
-        <td>{{ at['status'] }}</td>
-        <td>{{ at['remarks'] }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4">No attendance records.</td></tr>
       {% endfor %}
     </tbody>
   </table>

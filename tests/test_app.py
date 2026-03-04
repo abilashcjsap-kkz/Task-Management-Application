@@ -29,6 +29,16 @@ class TaskManagementAppTestCase(unittest.TestCase):
         self.assertEqual(create_resp.status_code, 200)
         self.assertIn(b"Client added successfully", create_resp.data)
 
+    def test_admin_can_create_member_with_email(self):
+        self.login("admin", "admin123")
+        create_member_resp = self.client.post(
+            "/members",
+            data={"username": "john", "email": "john@example.com", "password": "pass123"},
+            follow_redirects=True,
+        )
+        self.assertEqual(create_member_resp.status_code, 200)
+        self.assertIn(b"Member created successfully", create_member_resp.data)
+
     def test_manager_assigns_task_with_client_and_due_date(self):
         self.login("manager", "manager123")
         with task_app.app.app_context():
@@ -38,9 +48,9 @@ class TaskManagementAppTestCase(unittest.TestCase):
         resp = self.client.post(
             "/tasks/create",
             data={
+                "client_id": str(client_id),
                 "title": "Prepare release",
                 "description": "v1 planning",
-                "client_id": str(client_id),
                 "assigned_to": "3",
                 "due_date": "2030-01-01",
             },
@@ -58,9 +68,9 @@ class TaskManagementAppTestCase(unittest.TestCase):
         self.client.post(
             "/tasks/create",
             data={
+                "client_id": str(client_id),
                 "title": "Documentation",
                 "description": "Write docs",
-                "client_id": str(client_id),
                 "assigned_to": "3",
                 "due_date": "2030-01-01",
             },
@@ -81,15 +91,8 @@ class TaskManagementAppTestCase(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b"Task updated successfully", resp.data)
 
-    def test_attendance_and_report(self):
+    def test_manager_can_download_report(self):
         self.login("manager", "manager123")
-        att_resp = self.client.post(
-            "/attendance",
-            data={"attendance_date": "2030-01-02", "status": "present", "remarks": "On time"},
-            follow_redirects=True,
-        )
-        self.assertEqual(att_resp.status_code, 200)
-
         report_resp = self.client.get("/reports/task-logs?start_date=2030-01-01&end_date=2030-01-31")
         self.assertEqual(report_resp.status_code, 200)
         self.assertEqual(report_resp.mimetype, "text/csv")
