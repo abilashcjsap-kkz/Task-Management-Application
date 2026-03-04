@@ -1,12 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="card">
-  <h2>Member Management</h2>
+  <h2>User Management (Members & Managers)</h2>
   <form method="post" class="inline-form wrap">
-    <input name="username" placeholder="Member name" required />
-    <input type="email" name="email" placeholder="Member mail id" required />
+    <input name="username" placeholder="Name" required />
+    <input type="email" name="email" placeholder="Mail Id" required />
     <input type="password" name="password" placeholder="Password" required />
-    <button class="btn primary" type="submit">Create Member</button>
+    <select name="role" required>
+      <option value="member">Member</option>
+      <option value="manager">Manager</option>
+    </select>
+    <button class="btn primary" type="submit">Create User</button>
   </form>
 </section>
 
@@ -14,33 +18,35 @@
   <table>
     <thead>
       <tr>
-        <th>Member Name</th>
-        <th>Member Mail Id</th>
+        <th>Name</th>
+        <th>Mail Id</th>
+        <th>Role</th>
         <th>Created</th>
         <th>Reset Password</th>
         <th>Delete</th>
       </tr>
     </thead>
     <tbody>
-      {% for member in members %}
+      {% for user in users %}
       <tr>
-        <td>{{ member['username'] }}</td>
-        <td>{{ member['email'] }}</td>
-        <td>{{ member['created_at'] }}</td>
+        <td>{{ user['username'] }}</td>
+        <td>{{ user['email'] }}</td>
+        <td>{{ user['role'] }}</td>
+        <td>{{ user['created_at'] }}</td>
         <td>
-          <form action="{{ url_for('reset_password', member_id=member['id']) }}" method="post" class="inline-form">
+          <form action="{{ url_for('reset_password', user_id=user['id']) }}" method="post" class="inline-form">
             <input type="password" name="new_password" placeholder="New password" required />
             <button class="btn" type="submit">Reset</button>
           </form>
         </td>
         <td>
-          <form action="{{ url_for('delete_member', member_id=member['id']) }}" method="post">
+          <form action="{{ url_for('delete_member', user_id=user['id']) }}" method="post">
             <button class="btn danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5">No members found.</td></tr>
+      <tr><td colspan="6">No users found.</td></tr>
       {% endfor %}
     </tbody>
   </table>

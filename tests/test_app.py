@@ -23,55 +23,71 @@ class TaskManagementAppTestCase(unittest.TestCase):
     def logout(self):
         self.client.get("/logout", follow_redirects=True)
 
-    def test_admin_can_manage_clients(self):
+    def test_admin_can_create_member_or_manager(self):
         self.login("admin", "admin123")
-        create_resp = self.client.post("/clients", data={"name": "Acme", "description": "Enterprise"}, follow_redirects=True)
-        self.assertEqual(create_resp.status_code, 200)
-        self.assertIn(b"Client added successfully", create_resp.data)
-
-    def test_admin_can_create_member_with_email(self):
-        self.login("admin", "admin123")
-        create_member_resp = self.client.post(
+        create_manager = self.client.post(
             "/members",
-            data={"username": "john", "email": "john@example.com", "password": "pass123"},
+            data={"username": "managerx", "email": "mx@example.com", "password": "pass123", "role": "manager"},
             follow_redirects=True,
         )
-        self.assertEqual(create_member_resp.status_code, 200)
-        self.assertIn(b"Member created successfully", create_member_resp.data)
+        self.assertEqual(create_manager.status_code, 200)
+        self.assertIn(b"Manager created successfully", create_manager.data)
 
-    def test_manager_assigns_task_with_client_and_due_date(self):
-        self.login("manager", "manager123")
+        create_member = self.client.post(
+            "/members",
+            data={"username": "memberx", "email": "ux@example.com", "password": "pass123", "role": "member"},
+            follow_redirects=True,
+        )
+        self.assertEqual(create_member.status_code, 200)
+        self.assertIn(b"Member created successfully", create_member.data)
+
+    def test_multiple_managers_can_assign_tasks(self):
         with task_app.app.app_context():
             db = task_app.get_db()
             client_id = db.execute("SELECT id FROM clients LIMIT 1").fetchone()["id"]
 
-        resp = self.client.post(
+        self.login("manager", "manager123")
+        r1 = self.client.post(
             "/tasks/create",
             data={
                 "client_id": str(client_id),
-                "title": "Prepare release",
-                "description": "v1 planning",
-                "assigned_to": "3",
+                "title": "Task by manager",
+                "description": "first",
+                "assigned_to": "4",
                 "due_date": "2030-01-01",
             },
             follow_redirects=True,
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn(b"Task created successfully", resp.data)
+        self.assertEqual(r1.status_code, 200)
+        self.logout()
 
-    def test_member_updates_status_and_hours_directly(self):
-        self.login("admin", "admin123")
+        self.login("manager2", "manager123")
+        r2 = self.client.post(
+            "/tasks/create",
+            data={
+                "client_id": str(client_id),
+                "title": "Task by manager2",
+                "description": "second",
+                "assigned_to": "4",
+                "due_date": "2030-01-02",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(r2.status_code, 200)
+
+    def test_member_can_only_update_hours_taken(self):
         with task_app.app.app_context():
             db = task_app.get_db()
             client_id = db.execute("SELECT id FROM clients LIMIT 1").fetchone()["id"]
 
+        self.login("manager", "manager123")
         self.client.post(
             "/tasks/create",
             data={
                 "client_id": str(client_id),
-                "title": "Documentation",
-                "description": "Write docs",
-                "assigned_to": "3",
+                "title": "Hours only",
+                "description": "no status update",
+                "assigned_to": "4",
                 "due_date": "2030-01-01",
             },
             follow_redirects=True,
@@ -81,15 +97,21 @@ class TaskManagementAppTestCase(unittest.TestCase):
         self.login("member", "member123")
         with task_app.app.app_context():
             db = task_app.get_db()
-            task_id = db.execute("SELECT id FROM tasks LIMIT 1").fetchone()["id"]
+            task_id = db.execute("SELECT id, status FROM tasks LIMIT 1").fetchone()["id"]
 
         resp = self.client.post(
             f"/tasks/{task_id}/update",
-            data={"status": "in_progress", "hours_spent": "4.5"},
+            data={"hours_spent": "5.25"},
             follow_redirects=True,
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertIn(b"Task updated successfully", resp.data)
+        self.assertIn(b"Hours updated successfully", resp.data)
+
+        with task_app.app.app_context():
+            db = task_app.get_db()
+            task = db.execute("SELECT hours_spent, status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            self.assertEqual(task["status"], "todo")
+            self.assertAlmostEqual(task["hours_spent"], 5.25)
 
     def test_manager_can_download_report(self):
         self.login("manager", "manager123")

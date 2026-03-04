@@ -99,6 +99,7 @@ def init_db():
     defaults = [
         ("admin", "admin@kamikaze.local", "admin123", "admin"),
         ("manager", "manager@kamikaze.local", "manager123", "manager"),
+        ("manager2", "manager2@kamikaze.local", "manager123", "manager"),
         ("member", "member@kamikaze.local", "member123", "member"),
     ]
 
@@ -263,56 +264,69 @@ def manage_members():
         username = request.form["username"].strip()
         email = request.form["email"].strip()
         password = request.form["password"].strip()
+        role = request.form["role"]
+
+        if role not in ["member", "manager"]:
+            flash("Role must be member or manager.", "danger")
+            return redirect(url_for("manage_members"))
 
         if not username or not email or not password:
-            flash("Member name, email and password are required.", "danger")
+            flash("Name, email and password are required.", "danger")
             return redirect(url_for("manage_members"))
 
         try:
             db.execute(
-                "INSERT INTO users (username, email, password_hash, role, created_at) VALUES (?, ?, ?, 'member', ?)",
-                (username, email, generate_password_hash(password), datetime.utcnow().isoformat()),
+                "INSERT INTO users (username, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                (username, email, generate_password_hash(password), role, datetime.utcnow().isoformat()),
             )
             db.commit()
-            flash("Member created successfully.", "success")
+            flash(f"{role.title()} created successfully.", "success")
         except sqlite3.IntegrityError:
-            flash("Member name already exists.", "danger")
+            flash("Name already exists.", "danger")
         return redirect(url_for("manage_members"))
 
-    members = db.execute(
-        "SELECT id, username, email, created_at FROM users WHERE role = 'member' ORDER BY created_at DESC"
+    users = db.execute(
+        "SELECT id, username, email, role, created_at FROM users WHERE role IN ('member','manager') ORDER BY created_at DESC"
     ).fetchall()
-    return render_template("members.html", members=members)
+    return render_template("members.html", users=users)
 
 
-@app.route("/members/<int:member_id>/delete", methods=["POST"])
+@app.route("/members/<int:user_id>/delete", methods=["POST"])
 @login_required
 @role_required("admin")
-def delete_member(member_id):
+def delete_member(user_id):
     db = get_db()
-    assigned_count = db.execute("SELECT COUNT(*) AS cnt FROM tasks WHERE assigned_to = ?", (member_id,)).fetchone()["cnt"]
+    row = db.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row is None or row["role"] not in ["member", "manager"]:
+        flash("User not found.", "danger")
+        return redirect(url_for("manage_members"))
+
+    assigned_count = db.execute("SELECT COUNT(*) AS cnt FROM tasks WHERE assigned_to = ?", (user_id,)).fetchone()["cnt"]
     if assigned_count > 0:
-        flash("Cannot delete member with assigned tasks.", "danger")
+        flash("Cannot delete user with assigned tasks.", "danger")
     else:
-        db.execute("DELETE FROM users WHERE id = ? AND role = 'member'", (member_id,))
+        db.execute("DELETE FROM users WHERE id = ?", (user_id,))
         db.commit()
-        flash("Member deleted.", "success")
+        flash("User deleted.", "success")
     return redirect(url_for("manage_members"))
 
 
-@app.route("/members/<int:member_id>/reset-password", methods=["POST"])
+@app.route("/members/<int:user_id>/reset-password", methods=["POST"])
 @login_required
 @role_required("admin")
-def reset_password(member_id):
+def reset_password(user_id):
     new_password = request.form["new_password"].strip()
     if not new_password:
         flash("New password is required.", "danger")
         return redirect(url_for("manage_members"))
+
     db = get_db()
-    db.execute(
-        "UPDATE users SET password_hash = ? WHERE id = ? AND role = 'member'",
-        (generate_password_hash(new_password), member_id),
-    )
+    row = db.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row is None or row["role"] not in ["member", "manager"]:
+        flash("User not found.", "danger")
+        return redirect(url_for("manage_members"))
+
+    db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (generate_password_hash(new_password), user_id))
     db.commit()
     flash("Password reset successfully.", "success")
     return redirect(url_for("manage_members"))
@@ -453,13 +467,7 @@ def update_task(task_id):
         flash("Task not found or not assigned to you.", "danger")
         return redirect(url_for("dashboard"))
 
-    status = request.form["status"]
     hours_spent = request.form.get("hours_spent", "0").strip() or "0"
-
-    if status not in ["todo", "in_progress", "done"]:
-        flash("Invalid status.", "danger")
-        return redirect(url_for("dashboard"))
-
     try:
         hours_value = float(hours_spent)
         if hours_value < 0:
@@ -469,11 +477,11 @@ def update_task(task_id):
         return redirect(url_for("dashboard"))
 
     db.execute(
-        "UPDATE tasks SET status = ?, hours_spent = ?, updated_at = ? WHERE id = ?",
-        (status, hours_value, datetime.utcnow().isoformat(), task_id),
+        "UPDATE tasks SET hours_spent = ?, updated_at = ? WHERE id = ?",
+        (hours_value, datetime.utcnow().isoformat(), task_id),
     )
     db.commit()
-    flash("Task updated successfully.", "success")
+    flash("Hours updated successfully.", "success")
     return redirect(url_for("dashboard"))
 
 
@@ -503,9 +511,11 @@ def export_task_logs():
                t.allocated_date,
                t.due_date,
                t.hours_spent,
-               t.status
+               t.status,
+               a.username AS assigned_by
         FROM tasks t
         JOIN users u ON u.id = t.assigned_to
+        JOIN users a ON a.id = t.assigned_by
         JOIN clients c ON c.id = t.client_id
         WHERE date(t.updated_at) BETWEEN date(?) AND date(?)
         ORDER BY t.updated_at DESC
@@ -525,6 +535,7 @@ def export_task_logs():
             "Due Date",
             "Hours Spent",
             "Status",
+            "Assigned By",
         ]
     )
     for row in rows:
@@ -538,6 +549,7 @@ def export_task_logs():
                 row["due_date"],
                 row["hours_spent"],
                 row["status"],
+                row["assigned_by"],
             ]
         )
 
