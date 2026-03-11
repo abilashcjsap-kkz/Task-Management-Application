@@ -348,16 +348,54 @@ def dashboard():
             inputs_by_task=inputs_by_task,
         )
 
+    member_client_id = request.args.get("member_client_id", "").strip()
+    member_assigned_by = request.args.get("member_assigned_by", "").strip()
+    member_allocated_date = request.args.get("member_allocated_date", "").strip()
+    member_status = request.args.get("member_status", "").strip()
+
+    member_filters = ["t.assigned_to = ?"]
+    member_params = [current_user["id"]]
+
+    if member_client_id:
+        try:
+            int(member_client_id)
+            member_filters.append("t.client_id = ?")
+            member_params.append(member_client_id)
+        except ValueError:
+            flash("Invalid member client filter.", "danger")
+
+    if member_assigned_by:
+        try:
+            int(member_assigned_by)
+            member_filters.append("t.assigned_by = ?")
+            member_params.append(member_assigned_by)
+        except ValueError:
+            flash("Invalid assigned by filter.", "danger")
+
+    if member_allocated_date:
+        try:
+            datetime.strptime(member_allocated_date, "%Y-%m-%d")
+            member_filters.append("date(t.allocated_date) = date(?)")
+            member_params.append(member_allocated_date)
+        except ValueError:
+            flash("Invalid allocated date filter.", "danger")
+
+    if member_status in ["todo", "in_progress", "done"]:
+        member_filters.append("t.status = ?")
+        member_params.append(member_status)
+
+    member_where = " WHERE " + " AND ".join(member_filters)
+
     tasks = db.execute(
-        """
+        f"""
         SELECT t.*, c.name AS client_name, a.username AS assigner_name
         FROM tasks t
         JOIN clients c ON c.id = t.client_id
         JOIN users a ON a.id = t.assigned_by
-        WHERE t.assigned_to = ?
+        {member_where}
         ORDER BY t.created_at DESC
         """,
-        (current_user["id"],),
+        member_params,
     ).fetchall()
 
     task_ids = [str(t["id"]) for t in tasks]
@@ -375,7 +413,43 @@ def dashboard():
         for row in rows:
             inputs_by_task.setdefault(row["task_id"], []).append(row)
 
-    return render_template("dashboard_member.html", tasks=tasks, inputs_by_task=inputs_by_task)
+    member_clients = db.execute(
+        """
+        SELECT DISTINCT c.id, c.name
+        FROM tasks t
+        JOIN clients c ON c.id = t.client_id
+        WHERE t.assigned_to = ?
+        ORDER BY c.name
+        """,
+        (current_user["id"],),
+    ).fetchall()
+
+    member_assigners = db.execute(
+        """
+        SELECT DISTINCT u.id, u.username
+        FROM tasks t
+        JOIN users u ON u.id = t.assigned_by
+        WHERE t.assigned_to = ?
+        ORDER BY u.username
+        """,
+        (current_user["id"],),
+    ).fetchall()
+
+    member_filter_values = {
+        "member_client_id": member_client_id,
+        "member_assigned_by": member_assigned_by,
+        "member_allocated_date": member_allocated_date,
+        "member_status": member_status,
+    }
+
+    return render_template(
+        "dashboard_member.html",
+        tasks=tasks,
+        inputs_by_task=inputs_by_task,
+        member_clients=member_clients,
+        member_assigners=member_assigners,
+        member_filter_values=member_filter_values,
+    )
 
 
 @app.route("/members", methods=["GET", "POST"])

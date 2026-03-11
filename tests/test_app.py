@@ -221,6 +221,59 @@ class TaskManagementAppTestCase(unittest.TestCase):
         self.assertNotIn(b"FilterOtherTask", response.data)
 
 
+
+    def test_member_filters_by_client_assigned_by_allocated_date_and_status(self):
+        with task_app.app.app_context():
+            db = task_app.get_db()
+            clients = db.execute("SELECT id FROM clients ORDER BY id").fetchall()
+            client1 = clients[0]["id"]
+            client2 = clients[1]["id"]
+            manager_id = db.execute("SELECT id FROM users WHERE username = 'manager'").fetchone()["id"]
+            manager2_id = db.execute("SELECT id FROM users WHERE username = 'manager2'").fetchone()["id"]
+
+        self.login("manager", "manager123")
+        self.client.post(
+            "/tasks/create",
+            data={
+                "client_id": str(client1),
+                "title": "MemberFilterMatch",
+                "description": "match",
+                "assigned_to": "4",
+                "due_date": "2030-01-01",
+            },
+            follow_redirects=True,
+        )
+        self.logout()
+
+        self.login("manager2", "manager123")
+        self.client.post(
+            "/tasks/create",
+            data={
+                "client_id": str(client2),
+                "title": "MemberFilterOther",
+                "description": "other",
+                "assigned_to": "4",
+                "due_date": "2030-01-02",
+            },
+            follow_redirects=True,
+        )
+        self.logout()
+
+        with task_app.app.app_context():
+            db = task_app.get_db()
+            match_task = db.execute("SELECT id, allocated_date FROM tasks WHERE title = 'MemberFilterMatch'").fetchone()
+            db.execute("UPDATE tasks SET status = 'in_progress' WHERE id = ?", (match_task["id"],))
+            db.commit()
+
+        self.login("member", "member123")
+        response = self.client.get(
+            f"/dashboard?member_client_id={client1}&member_assigned_by={manager_id}&member_allocated_date={match_task['allocated_date']}&member_status=in_progress",
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"MemberFilterMatch", response.data)
+        self.assertNotIn(b"MemberFilterOther", response.data)
+
     def test_member_can_add_datewise_input_and_manager_can_view(self):
         with task_app.app.app_context():
             db = task_app.get_db()

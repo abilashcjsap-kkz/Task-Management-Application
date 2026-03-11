@@ -1,6 +1,42 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="card">
+  <h2>My Task Filters</h2>
+  <form action="{{ url_for('dashboard') }}" method="get" class="inline-form wrap filter-bar">
+    <label>
+      Client
+      <select name="member_client_id">
+        <option value="">All Clients</option>
+        {% for c in member_clients %}
+        <option value="{{ c['id'] }}" {% if member_filter_values['member_client_id'] == (c['id'] | string) %}selected{% endif %}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Assigned By
+      <select name="member_assigned_by">
+        <option value="">All</option>
+        {% for a in member_assigners %}
+        <option value="{{ a['id'] }}" {% if member_filter_values['member_assigned_by'] == (a['id'] | string) %}selected{% endif %}>{{ a['username'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Allocated Date <input type="date" name="member_allocated_date" value="{{ member_filter_values['member_allocated_date'] }}" /></label>
+    <label>
+      Status
+      <select name="member_status">
+        <option value="">All Status</option>
+        <option value="todo" {% if member_filter_values['member_status'] == 'todo' %}selected{% endif %}>To Do</option>
+        <option value="in_progress" {% if member_filter_values['member_status'] == 'in_progress' %}selected{% endif %}>In Progress</option>
+        <option value="done" {% if member_filter_values['member_status'] == 'done' %}selected{% endif %}>Done</option>
+      </select>
+    </label>
+    <button class="btn" type="submit">Apply Filters</button>
+    <a class="btn" href="{{ url_for('dashboard') }}">Clear</a>
+  </form>
+</section>
+
+<section class="card">
   <h2>My Tasks</h2>
   <table>
     <thead>
