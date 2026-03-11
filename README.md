@@ -63,3 +63,10 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 ## Login page change password popup
 - Click **Change Password** link on login page to open a popup form.
 - Provide username, old password, new password and confirm password to update credentials.
+
+
+## Member task action buttons
+- Members get two task buttons:
+  - **View Description** (popup showing manager-assigned task description)
+  - **Add Daily Input** (popup to submit date-wise input notes)
+- Managers/Admin can click **View Inputs** per task to see member-entered date-wise inputs.

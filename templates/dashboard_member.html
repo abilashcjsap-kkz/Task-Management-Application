@@ -14,6 +14,7 @@
         <th>Hours Taken</th>
         <th>Update Hours</th>
         <th>Update Status</th>
+        <th>Task Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -42,11 +43,81 @@
             <button class="btn" type="submit">Save Status</button>
           </form>
         </td>
+        <td>
+          <button type="button" class="btn" data-modal-open="desc-modal-{{ task['id'] }}">View Description</button>
+          <button type="button" class="btn" data-modal-open="input-modal-{{ task['id'] }}">Add Daily Input</button>
+        </td>
       </tr>
+
+      <tr class="sub-row">
+        <td colspan="10">
+          <strong>My Inputs:</strong>
+          {% set rows = inputs_by_task.get(task['id'], []) %}
+          {% if rows %}
+            <ul class="compact-list">
+              {% for item in rows %}
+              <li><strong>{{ item['input_date'] }}</strong> — {{ item['input_text'] }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <span class="hint">No inputs added yet.</span>
+          {% endif %}
+        </td>
+      </tr>
+
+      <div id="desc-modal-{{ task['id'] }}" class="modal hidden">
+        <div class="modal-content card">
+          <div class="modal-header">
+            <h3>Task Description</h3>
+            <button class="btn" type="button" data-modal-close="desc-modal-{{ task['id'] }}">Close</button>
+          </div>
+          <p><strong>{{ task['title'] }}</strong></p>
+          <p>{{ task['description'] or 'No description provided.' }}</p>
+        </div>
+      </div>
+
+      <div id="input-modal-{{ task['id'] }}" class="modal hidden">
+        <div class="modal-content card">
+          <div class="modal-header">
+            <h3>Add Date-wise Input</h3>
+            <button class="btn" type="button" data-modal-close="input-modal-{{ task['id'] }}">Close</button>
+          </div>
+          <form action="{{ url_for('add_member_input', task_id=task['id']) }}" method="post" class="form-grid">
+            <label>Date <input type="date" name="input_date" required /></label>
+            <label>Input <textarea name="input_text" rows="4" required></textarea></label>
+            <button class="btn primary" type="submit">Save Input</button>
+          </form>
+        </div>
+      </div>
+
       {% else %}
-      <tr><td colspan="9">No tasks assigned.</td></tr>
+      <tr><td colspan="10">No tasks assigned.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </section>
+
+<script>
+  document.querySelectorAll('[data-modal-open]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-modal-open');
+      var modal = document.getElementById(id);
+      if (modal) modal.classList.remove('hidden');
+    });
+  });
+
+  document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-modal-close');
+      var modal = document.getElementById(id);
+      if (modal) modal.classList.add('hidden');
+    });
+  });
+
+  document.querySelectorAll('.modal').forEach(function (modal) {
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  });
+</script>
 {% endblock %}

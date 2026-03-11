@@ -184,3 +184,17 @@ td {
   align-items: center;
   margin-bottom: 10px;
 }
+
+
+.compact-list {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+
+.compact-list li {
+  margin-bottom: 4px;
+}
+
+.sub-row td {
+  background: #f8fafc;
+}

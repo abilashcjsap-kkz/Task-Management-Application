@@ -97,6 +97,7 @@
         <th>Hours Taken</th>
         <th>Update Status</th>
         <th>Extend Due Date</th>
+        <th>Member Inputs</th>
       </tr>
     </thead>
     <tbody>
@@ -126,11 +127,59 @@
             <button class="btn" type="submit">Extend</button>
           </form>
         </td>
+        <td>
+          <button type="button" class="btn" data-modal-open="manager-inputs-{{ task['id'] }}">View Inputs</button>
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="10">No tasks available.</td></tr>
+      <tr><td colspan="11">No tasks available.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </section>
+
+{% for task in tasks %}
+<div id="manager-inputs-{{ task['id'] }}" class="modal hidden">
+  <div class="modal-content card">
+    <div class="modal-header">
+      <h3>Member Inputs - {{ task['title'] }}</h3>
+      <button class="btn" type="button" data-modal-close="manager-inputs-{{ task['id'] }}">Close</button>
+    </div>
+    {% set entries = inputs_by_task.get(task['id'], []) %}
+    {% if entries %}
+    <ul class="compact-list">
+      {% for e in entries %}
+      <li><strong>{{ e['input_date'] }}</strong> — {{ e['member_name'] }}: {{ e['input_text'] }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="hint">No inputs submitted by members yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<script>
+  document.querySelectorAll('[data-modal-open]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-modal-open');
+      var modal = document.getElementById(id);
+      if (modal) modal.classList.remove('hidden');
+    });
+  });
+
+  document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-modal-close');
+      var modal = document.getElementById(id);
+      if (modal) modal.classList.add('hidden');
+    });
+  });
+
+  document.querySelectorAll('.modal').forEach(function (modal) {
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  });
+</script>
 {% endblock %}

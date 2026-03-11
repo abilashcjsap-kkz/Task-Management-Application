@@ -91,6 +91,21 @@ def init_db():
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS task_member_inputs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            input_date TEXT NOT NULL,
+            input_text TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES tasks(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+        """
+    )
+
     ensure_tasks_hours_column(db)
     ensure_users_email_column(db)
     db.commit()
@@ -299,6 +314,23 @@ def dashboard():
         members = db.execute("SELECT id, username FROM users WHERE role = 'member' ORDER BY username").fetchall()
         clients = db.execute("SELECT id, name FROM clients ORDER BY name").fetchall()
 
+        task_ids = [str(t["id"]) for t in tasks]
+        inputs_by_task = {}
+        if task_ids:
+            placeholders = ",".join(["?"] * len(task_ids))
+            rows = db.execute(
+                f"""
+                SELECT tmi.*, u.username AS member_name
+                FROM task_member_inputs tmi
+                JOIN users u ON u.id = tmi.user_id
+                WHERE tmi.task_id IN ({placeholders})
+                ORDER BY tmi.input_date DESC, tmi.created_at DESC
+                """,
+                task_ids,
+            ).fetchall()
+            for row in rows:
+                inputs_by_task.setdefault(row["task_id"], []).append(row)
+
         filter_values = {
             "created_from": created_from,
             "created_to": created_to,
@@ -313,6 +345,7 @@ def dashboard():
             members=members,
             clients=clients,
             filter_values=filter_values,
+            inputs_by_task=inputs_by_task,
         )
 
     tasks = db.execute(
@@ -327,7 +360,22 @@ def dashboard():
         (current_user["id"],),
     ).fetchall()
 
-    return render_template("dashboard_member.html", tasks=tasks)
+    task_ids = [str(t["id"]) for t in tasks]
+    inputs_by_task = {}
+    if task_ids:
+        placeholders = ",".join(["?"] * len(task_ids))
+        rows = db.execute(
+            f"""
+            SELECT * FROM task_member_inputs
+            WHERE user_id = ? AND task_id IN ({placeholders})
+            ORDER BY input_date DESC, created_at DESC
+            """,
+            [current_user["id"], *task_ids],
+        ).fetchall()
+        for row in rows:
+            inputs_by_task.setdefault(row["task_id"], []).append(row)
+
+    return render_template("dashboard_member.html", tasks=tasks, inputs_by_task=inputs_by_task)
 
 
 @app.route("/members", methods=["GET", "POST"])
@@ -507,6 +555,42 @@ def create_task():
     )
     db.commit()
     flash("Task created successfully.", "success")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/tasks/<int:task_id>/member-input", methods=["POST"])
+@login_required
+@role_required("member")
+def add_member_input(task_id):
+    db = get_db()
+    current_user = get_current_user()
+    task = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if task is None or task["assigned_to"] != current_user["id"]:
+        flash("Task not found or not assigned to you.", "danger")
+        return redirect(url_for("dashboard"))
+
+    input_date = request.form.get("input_date", "").strip()
+    input_text = request.form.get("input_text", "").strip()
+
+    if not input_text:
+        flash("Input text is required.", "danger")
+        return redirect(url_for("dashboard"))
+
+    try:
+        datetime.strptime(input_date, "%Y-%m-%d")
+    except ValueError:
+        flash("Valid input date is required.", "danger")
+        return redirect(url_for("dashboard"))
+
+    db.execute(
+        """
+        INSERT INTO task_member_inputs (task_id, user_id, input_date, input_text, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (task_id, current_user["id"], input_date, input_text, datetime.utcnow().isoformat()),
+    )
+    db.commit()
+    flash("Task input added successfully.", "success")
     return redirect(url_for("dashboard"))
 
 

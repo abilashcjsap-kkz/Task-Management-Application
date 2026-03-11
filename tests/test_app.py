@@ -220,6 +220,47 @@ class TaskManagementAppTestCase(unittest.TestCase):
         self.assertIn(b"FilterMatchTask", response.data)
         self.assertNotIn(b"FilterOtherTask", response.data)
 
+
+    def test_member_can_add_datewise_input_and_manager_can_view(self):
+        with task_app.app.app_context():
+            db = task_app.get_db()
+            client_id = db.execute("SELECT id FROM clients LIMIT 1").fetchone()["id"]
+
+        self.login("manager", "manager123")
+        self.client.post(
+            "/tasks/create",
+            data={
+                "client_id": str(client_id),
+                "title": "InputTask",
+                "description": "Need daily update",
+                "assigned_to": "4",
+                "due_date": "2030-01-10",
+            },
+            follow_redirects=True,
+        )
+        self.logout()
+
+        self.login("member", "member123")
+        with task_app.app.app_context():
+            db = task_app.get_db()
+            task_id = db.execute("SELECT id FROM tasks WHERE title = 'InputTask'").fetchone()["id"]
+
+        add_input = self.client.post(
+            f"/tasks/{task_id}/member-input",
+            data={"input_date": "2030-01-03", "input_text": "Completed module A"},
+            follow_redirects=True,
+        )
+        self.assertEqual(add_input.status_code, 200)
+        self.assertIn(b"Task input added successfully", add_input.data)
+        self.assertIn(b"Completed module A", add_input.data)
+        self.logout()
+
+        self.login("manager", "manager123")
+        manager_view = self.client.get("/dashboard", follow_redirects=True)
+        self.assertEqual(manager_view.status_code, 200)
+        self.assertIn(b"View Inputs", manager_view.data)
+        self.assertIn(b"Completed module A", manager_view.data)
+
     def test_manager_can_download_report(self):
         self.login("manager", "manager123")
         report_resp = self.client.get("/reports/task-logs?start_date=2030-01-01&end_date=2030-01-31")
