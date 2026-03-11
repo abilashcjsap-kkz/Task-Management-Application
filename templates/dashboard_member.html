@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card">
+  <h2>My Task Filters</h2>
+  <form action="{{ url_for('dashboard') }}" method="get" class="inline-form wrap filter-bar">
+    <label>
+      Client
+      <select name="member_client_id">
+        <option value="">All Clients</option>
+        {% for c in member_clients %}
+        <option value="{{ c['id'] }}" {% if member_filter_values['member_client_id'] == (c['id'] | string) %}selected{% endif %}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Assigned By
+      <select name="member_assigned_by">
+        <option value="">All</option>
+        {% for a in member_assigners %}
+        <option value="{{ a['id'] }}" {% if member_filter_values['member_assigned_by'] == (a['id'] | string) %}selected{% endif %}>{{ a['username'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Allocated Date <input type="date" name="member_allocated_date" value="{{ member_filter_values['member_allocated_date'] }}" /></label>
+    <label>
+      Status
+      <select name="member_status">
+        <option value="">All Status</option>
+        <option value="todo" {% if member_filter_values['member_status'] == 'todo' %}selected{% endif %}>To Do</option>
+        <option value="in_progress" {% if member_filter_values['member_status'] == 'in_progress' %}selected{% endif %}>In Progress</option>
+        <option value="done" {% if member_filter_values['member_status'] == 'done' %}selected{% endif %}>Done</option>
+      </select>
+    </label>
+    <button class="btn" type="submit">Apply Filters</button>
+    <a class="btn" href="{{ url_for('dashboard') }}">Clear</a>
+  </form>
+</section>
+
+<section class="card">
+  <h2>My Tasks</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Task</th>
+        <th>Assigned By</th>
+        <th>Allocated Date</th>
+        <th>Due Date</th>
+        <th>Status</th>
+        <th>Hours Taken</th>
+        <th>Update Hours</th>
+        <th>Update Status</th>
+        <th>Task Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr>
+        <td>{{ task['client_name'] }}</td>
+        <td>{{ task['title'] }}</td>
+        <td>{{ task['assigner_name'] }}</td>
+        <td>{{ task['allocated_date'] }}</td>
+        <td>{{ task['due_date'] }}</td>
+        <td>{{ task['status'] }}</td>
+        <td>{{ '%.2f'|format(task['hours_spent'] or 0) }}</td>
+        <td>
+          <form action="{{ url_for('update_task', task_id=task['id']) }}" method="post" class="inline-form wrap">
+            <input type="number" step="0.25" min="0" name="hours_spent" value="{{ task['hours_spent'] }}" required />
+            <button class="btn" type="submit">Save Hours</button>
+          </form>
+        </td>
+        <td>
+          <form action="{{ url_for('update_task_status', task_id=task['id']) }}" method="post" class="inline-form">
+            <select name="status">
+              <option value="todo" {% if task['status']=='todo' %}selected{% endif %}>To Do</option>
+              <option value="in_progress" {% if task['status']=='in_progress' %}selected{% endif %}>In Progress</option>
+              <option value="done" {% if task['status']=='done' %}selected{% endif %}>Done</option>
+            </select>
+            <button class="btn" type="submit">Save Status</button>
+          </form>
+        </td>
+        <td>
+          <button type="button" class="btn" data-modal-open="desc-modal-{{ task['id'] }}">View Description</button>
+          <button type="button" class="btn" data-modal-open="input-modal-{{ task['id'] }}">Add Daily Input</button>
+        </td>
+      </tr>
+
+      <tr class="sub-row">
+        <td colspan="10">
+          <strong>My Inputs:</strong>
+          {% set rows = inputs_by_task.get(task['id'], []) %}
+          {% if rows %}
+            <ul class="compact-list">
+              {% for item in rows %}
+              <li><strong>{{ item['input_date'] }}</strong> — {{ item['input_text'] }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <span class="hint">No inputs added yet.</span>
+          {% endif %}
+        </td>
+      </tr>
+
+      <div id="desc-modal-{{ task['id'] }}" class="modal hidden">
+        <div class="modal-content card">
+          <div class="modal-header">
+            <h3>Task Description</h3>
+            <button class="btn" type="button" data-modal-close="desc-modal-{{ task['id'] }}">Close</button>
+          </div>
+          <p><strong>{{ task['title'] }}</strong></p>
+          <p>{{ task['description'] or 'No description provided.' }}</p>
+        </div>
+      </div>
+
+      <div id="input-modal-{{ task['id'] }}" class="modal hidden">
+        <div class="modal-content card">
+          <div class="modal-header">
+            <h3>Add Date-wise Input</h3>
+            <button class="btn" type="button" data-modal-close="input-modal-{{ task['id'] }}">Close</button>
+          </div>
+          <form action="{{ url_for('add_member_input', task_id=task['id']) }}" method="post" class="form-grid">
+            <label>Date <input type="date" name="input_date" required /></label>
+            <label>Input <textarea name="input_text" rows="4" required></textarea></label>
+            <button class="btn primary" type="submit">Save Input</button>
+          </form>
+        </div>
+      </div>
+
+      {% else %}
+      <tr><td colspan="10">No tasks assigned.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<script>
+  document.querySelectorAll('[data-modal-open]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-modal-open');
+      var modal = document.getElementById(id);
+      if (modal) modal.classList.remove('hidden');
+    });
+  });
+
+  document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-modal-close');
+      var modal = document.getElementById(id);
+      if (modal) modal.classList.add('hidden');
+    });
+  });
+
+  document.querySelectorAll('.modal').forEach(function (modal) {
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  });
+</script>
+{% endblock %}

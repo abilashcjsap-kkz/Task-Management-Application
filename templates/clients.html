@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card">
+  <h2>Client List (Admin only)</h2>
+  <form method="post" class="inline-form wrap">
+    <input name="name" placeholder="Client name" required />
+    <input name="description" placeholder="Description" />
+    <button class="btn primary" type="submit">Add Client</button>
+  </form>
+</section>
+
+<section class="card">
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Description</th><th>Update</th><th>Delete</th></tr>
+    </thead>
+    <tbody>
+      {% for client in clients %}
+      <tr>
+        <td>{{ client['name'] }}</td>
+        <td>{{ client['description'] }}</td>
+        <td>
+          <form action="{{ url_for('update_client', client_id=client['id']) }}" method="post" class="inline-form">
+            <input name="name" value="{{ client['name'] }}" required />
+            <input name="description" value="{{ client['description'] }}" />
+            <button class="btn" type="submit">Save</button>
+          </form>
+        </td>
+        <td>
+          <form action="{{ url_for('delete_client', client_id=client['id']) }}" method="post">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">No clients available.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

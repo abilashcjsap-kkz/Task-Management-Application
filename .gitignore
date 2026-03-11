@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+track_management.db
+task_management.db
+task_manager.db

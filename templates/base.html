@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task Management Application</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-wrap">
+        <img src="{{ url_for('static', filename='logo.svg') }}" alt="Kamikaze Solutions" class="logo" />
+        <h1>Task Management Application</h1>
+      </div>
+      {% if current_user %}
+      <nav class="top-nav">
+        <span class="pill">{{ current_user['username'] }} ({{ current_user['role'] }})</span>
+        <a class="btn" href="{{ url_for('dashboard') }}">Dashboard</a>
+        {% if current_user['role'] == 'admin' %}
+        <a class="btn" href="{{ url_for('manage_clients') }}">Clients</a>
+        <a class="btn" href="{{ url_for('manage_members') }}">Members</a>
+        {% endif %}
+        <a class="btn" href="{{ url_for('logout') }}">Logout</a>
+      </nav>
+      {% endif %}
+    </header>
+
+    <main class="container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
